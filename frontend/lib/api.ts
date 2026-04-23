@@ -13,7 +13,7 @@ async function request(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
-    // Upload
+    // ── Upload ──────────────────────────────────────────────────────────────
     uploadFile: async (file: File) => {
         const form = new FormData();
         form.append("file", file);
@@ -22,52 +22,125 @@ export const api = {
         return res.json();
     },
 
-    // Sessions
+    uploadPaste: async (
+        rawText: string,
+        fmt: "csv" | "json" = "csv",
+        name = "pasted_data"
+    ) =>
+        request("/api/upload/paste", {
+            method: "POST",
+            body: JSON.stringify({ raw_text: rawText, fmt, name }),
+        }),
+
+    uploadFromURL: async (url: string) =>
+        request("/api/upload/url", {
+            method: "POST",
+            body: JSON.stringify({ url }),
+        }),
+
+    uploadSQLite: async (file: File, tableName?: string) => {
+        const form = new FormData();
+        form.append("file", file);
+        if (tableName) form.append("table_name", tableName);
+        const res = await fetch(`${BASE_URL}/api/upload/sqlite`, {
+            method: "POST",
+            body: form,
+        });
+        if (!res.ok) throw new Error("SQLite upload failed");
+        return res.json();
+    },
+
+    // ── Sessions ─────────────────────────────────────────────────────────────
     getSessions: () => request("/api/sessions"),
     getSession: (id: string) => request(`/api/sessions/${id}`),
-    deleteSession: (id: string) => request(`/api/sessions/${id}`, { method: "DELETE" }),
-    reloadSession: (id: string) => request(`/api/sessions/${id}/reload`, { method: "POST" }),
+    deleteSession: (id: string) =>
+        request(`/api/sessions/${id}`, { method: "DELETE" }),
+    reloadSession: (id: string) =>
+        request(`/api/sessions/${id}/reload`, { method: "POST" }),
 
-    // Analysis
+    // ── Analysis ─────────────────────────────────────────────────────────────
     getEDA: (id: string) => request(`/api/eda/${id}`),
     getKPIs: (id: string) => request(`/api/kpis/${id}`),
     getInsights: (id: string) => request(`/api/insights/${id}`),
-    refreshInsights: (id: string) => request(`/api/insights/${id}/refresh`, { method: "POST" }),
+    refreshInsights: (id: string) =>
+        request(`/api/insights/${id}/refresh`, { method: "POST" }),
     getDataQuality: (id: string) => request(`/api/quality/${id}`),
 
-    // Data Explorer
-    getData: (id: string, page = 1, pageSize = 50, search?: string, sortCol?: string, sortDesc = false) => {
+    // ── Data Explorer ─────────────────────────────────────────────────────────
+    getData: (
+        id: string,
+        page = 1,
+        pageSize = 50,
+        search?: string,
+        sortCol?: string,
+        sortDesc = false
+    ) => {
         const params = new URLSearchParams({
-            page: String(page), page_size: String(pageSize), sort_desc: String(sortDesc),
-            ...(search && { search }), ...(sortCol && { sort_col: sortCol })
+            page: String(page),
+            page_size: String(pageSize),
+            sort_desc: String(sortDesc),
+            ...(search && { search }),
+            ...(sortCol && { sort_col: sortCol }),
         });
         return request(`/api/data/${id}?${params}`);
     },
 
-    // Visualization
+    // ── Visualization ─────────────────────────────────────────────────────────
     createViz: (params: {
-        session_id: string; chart_type: string;
-        x_col?: string; y_col?: string; color_col?: string; title?: string;
-    }) => request("/api/visualize", { method: "POST", body: JSON.stringify(params) }),
+        session_id: string;
+        chart_type: string;
+        x_col?: string;
+        y_col?: string;
+        color_col?: string;
+        title?: string;
+    }) =>
+        request("/api/visualize", {
+            method: "POST",
+            body: JSON.stringify(params),
+        }),
 
-    // Chat
+    // ── Chat ──────────────────────────────────────────────────────────────────
     chat: (sessionId: string, message: string, provider = "groq") =>
-        request("/api/chat", { method: "POST", body: JSON.stringify({ session_id: sessionId, message, provider }) }),
+        request("/api/chat", {
+            method: "POST",
+            body: JSON.stringify({ session_id: sessionId, message, provider }),
+        }),
     getChatHistory: (id: string) => request(`/api/chat/${id}/history`),
 
-    // Forecast & Segment
+    // ── Forecast & Segment ────────────────────────────────────────────────────
     forecast: (sessionId: string, valueCol: string, periods = 12) =>
-        request("/api/forecast", { method: "POST", body: JSON.stringify({ session_id: sessionId, value_col: valueCol, periods }) }),
+        request("/api/forecast", {
+            method: "POST",
+            body: JSON.stringify({
+                session_id: sessionId,
+                value_col: valueCol,
+                periods,
+            }),
+        }),
+
     segment: (sessionId: string, nClusters = 4, columns?: string[]) =>
-        request("/api/segment", { method: "POST", body: JSON.stringify({ session_id: sessionId, n_clusters: nClusters, columns }) }),
+        request("/api/segment", {
+            method: "POST",
+            body: JSON.stringify({
+                session_id: sessionId,
+                n_clusters: nClusters,
+                columns,
+            }),
+        }),
 
-    // Clean
+    // ── Clean ─────────────────────────────────────────────────────────────────
     cleanData: (sessionId: string, operations: string[]) =>
-        request("/api/clean", { method: "POST", body: JSON.stringify({ session_id: sessionId, operations }) }),
+        request("/api/clean", {
+            method: "POST",
+            body: JSON.stringify({ session_id: sessionId, operations }),
+        }),
 
-    // Reports
-    generatePDF: (id: string) => request(`/api/reports/pdf/${id}`, { method: "POST" }),
-    generateExcel: (id: string) => request(`/api/reports/excel/${id}`, { method: "POST" }),
+    // ── Reports ───────────────────────────────────────────────────────────────
+    generatePDF: (id: string) =>
+        request(`/api/reports/pdf/${id}`, { method: "POST" }),
+    generateExcel: (id: string) =>
+        request(`/api/reports/excel/${id}`, { method: "POST" }),
     listReports: (id: string) => request(`/api/reports/${id}`),
-    getDownloadURL: (fileName: string) => `${BASE_URL}/api/reports/download/${fileName}`,
+    getDownloadURL: (fileName: string) =>
+        `${BASE_URL}/api/reports/download/${fileName}`,
 };

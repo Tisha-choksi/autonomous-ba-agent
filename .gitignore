@@ -1,0 +1,131 @@
+# ─────────────────────────────────────────
+#  Autonomous Business Analyst Agent
+#  .gitignore
+# ─────────────────────────────────────────
+
+# ══════════════════════════════════════════
+#  FRONTEND — Next.js 15
+# ══════════════════════════════════════════
+frontend/node_modules/
+frontend/.next/
+frontend/.vercel/
+frontend/out/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+
+# ══════════════════════════════════════════
+#  BACKEND — FastAPI / Python
+# ══════════════════════════════════════════
+
+# Virtual environments
+backend/venv/
+backend/.venv/
+backend/env/
+backend/.env/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/**/*.pyo
+backend/**/*.pyd
+backend/.Python
+
+# Environment variables
+backend/.env
+
+# SQLite database (auto-created at runtime)
+backend/db/*.db
+backend/db/*.db-shm
+backend/db/*.db-wal
+
+# Uploaded files (user data — never commit)
+backend/storage/
+backend/exports/
+
+# Python egg / build artifacts
+backend/*.egg-info/
+backend/dist/
+backend/build/
+backend/.eggs/
+backend/pip-wheel-metadata/
+
+# pytest / coverage
+backend/.pytest_cache/
+backend/htmlcov/
+backend/.coverage
+backend/coverage.xml
+backend/*.cover
+
+# MyPy
+backend/.mypy_cache/
+backend/.dmypy.json
+
+# ══════════════════════════════════════════
+#  GENERAL
+# ══════════════════════════════════════════
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+
+# Logs
+*.log
+logs/
+
+# Temp / cache
+.cache/
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Secrets / keys (safety net)
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+.secrets
+
+# Jupyter (if used for EDA prototyping)
+.ipynb_checkpoints/
+*.ipynb
+
+# Large data files — don't accidentally commit datasets
+*.csv
+*.xlsx
+*.xls
+*.json
+!frontend/package.json
+!frontend/tsconfig.json
+!frontend/next.config.ts
+*.db
+*.sqlite
+*.sqlite3
+
+# ══════════════════════════════════════════
+#  RENDER / VERCEL DEPLOY ARTIFACTS
+# ══════════════════════════════════════════
+.render/
+.vercel/

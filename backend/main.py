@@ -70,6 +70,7 @@ class SegmentRequest(BaseModel):
     n_clusters: int = 4
     columns: Optional[list[str]] = None
 
+
 # ─── Upload ──────────────────────────────────────────────────────────────────
 
 @app.post("/api/upload")
@@ -315,3 +316,130 @@ def _ensure_data(session_id: str):
             store_dataframe(session_id, df)
         except Exception as e:
             raise HTTPException(500, f"Failed to reload data: {e}")
+
+# ─── Paste Raw Text ──────────────────────────────────────────────────────────
+
+class PasteRequest(BaseModel):
+    raw_text: str
+    fmt: str = "csv"          # "csv" or "json"
+    name: str = "pasted_data"
+
+@app.post("/api/upload/paste")
+def upload_paste(req: PasteRequest):
+    from agents.tools.load_data import load_from_text
+    session_id = str(uuid.uuid4())
+    try:
+        df = load_from_text(req.raw_text, req.fmt)
+    except Exception as e:
+        raise HTTPException(400, f"Could not parse pasted data: {e}")
+
+    store_dataframe(session_id, df)
+    columns_meta = get_columns_meta(df)
+    create_session(session_id, req.name, "", req.name, req.fmt,
+                   len(df), len(df.columns), columns_meta)
+
+    eda = run_eda(session_id)
+    kpis = calculate_kpis(session_id)
+    insights = generate_insights(session_id)
+    if kpis: save_kpis(session_id, kpis)
+    for ins in insights:
+        if "title" in ins:
+            save_insight(session_id, ins.get("type",""), ins["title"],
+                         ins.get("description",""), ins.get("severity","info"))
+
+    return {"session_id": session_id, "file_name": req.name, "rows": len(df),
+            "columns": len(df.columns), "column_names": df.columns.tolist(),
+            "columns_meta": columns_meta, "eda_summary": eda, "kpis": kpis, "insights": insights}
+
+
+# ─── URL Scrape ───────────────────────────────────────────────────────────────
+
+class URLRequest(BaseModel):
+    url: str
+
+@app.post("/api/upload/url")
+def upload_from_url(req: URLRequest):
+    from agents.tools.load_data import load_from_url
+    session_id = str(uuid.uuid4())
+    try:
+        df, source_desc = load_from_url(req.url)
+    except Exception as e:
+        raise HTTPException(400, f"Could not load from URL: {e}")
+
+    name = req.url.split("/")[-1].split("?")[0] or "scraped_data"
+    store_dataframe(session_id, df)
+    columns_meta = get_columns_meta(df)
+    create_session(session_id, name, req.url, name, "url",
+                   len(df), len(df.columns), columns_meta)
+
+    eda = run_eda(session_id)
+    kpis = calculate_kpis(session_id)
+    insights = generate_insights(session_id)
+    if kpis: save_kpis(session_id, kpis)
+    for ins in insights:
+        if "title" in ins:
+            save_insight(session_id, ins.get("type",""), ins["title"],
+                         ins.get("description",""), ins.get("severity","info"))
+
+    return {"session_id": session_id, "file_name": name, "source": source_desc,
+            "rows": len(df), "columns": len(df.columns),
+            "column_names": df.columns.tolist(), "columns_meta": columns_meta,
+            "eda_summary": eda, "kpis": kpis, "insights": insights}
+
+
+# ─── SQLite DB File ───────────────────────────────────────────────────────────
+
+@app.post("/api/upload/sqlite")
+async def upload_sqlite(file: UploadFile = File(...), table_name: str = None):
+    from agents.tools.load_data import load_sqlite_file, get_sqlite_tables
+    if not file.filename.endswith(".db"):
+        raise HTTPException(400, "Only .db (SQLite) files accepted")
+
+    session_id = str(uuid.uuid4())
+    db_path = STORAGE_PATH / f"{session_id}.db"
+    with open(db_path, "wb") as f:
+        f.write(await file.read())
+
+    # List tables first
+    try:
+        tables = get_sqlite_tables(str(db_path))
+    except Exception as e:
+        raise HTTPException(400, f"Invalid SQLite file: {e}")
+
+    try:
+        df = load_sqlite_file(str(db_path), table_name)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+    store_dataframe(session_id, df)
+    columns_meta = get_columns_meta(df)
+    create_session(session_id, file.filename, str(db_path), file.filename, "db",
+                   len(df), len(df.columns), columns_meta)
+
+    eda = run_eda(session_id)
+    kpis = calculate_kpis(session_id)
+    insights = generate_insights(session_id)
+    if kpis: save_kpis(session_id, kpis)
+    for ins in insights:
+        if "title" in ins:
+            save_insight(session_id, ins.get("type",""), ins["title"],
+                         ins.get("description",""), ins.get("severity","info"))
+
+    return {"session_id": session_id, "file_name": file.filename,
+            "available_tables": tables, "loaded_table": table_name or "(largest)",
+            "rows": len(df), "columns": len(df.columns),
+            "column_names": df.columns.tolist(), "columns_meta": columns_meta,
+            "eda_summary": eda, "kpis": kpis, "insights": insights}
+
+@app.get("/api/sqlite/tables")
+async def get_sqlite_tables_endpoint(file: UploadFile = File(...)):
+    """Preview tables in a SQLite file before loading."""
+    from agents.tools.load_data import get_sqlite_tables
+    tmp_path = STORAGE_PATH / f"tmp_{uuid.uuid4()}.db"
+    with open(tmp_path, "wb") as f:
+        f.write(await file.read())
+    try:
+        tables = get_sqlite_tables(str(tmp_path))
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    return {"tables": tables}
