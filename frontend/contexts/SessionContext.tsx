@@ -16,7 +16,7 @@ interface SessionContextType {
     sessions: any[];
     setSession: (s: Session | null) => void;
     loadSessions: () => Promise<void>;
-    uploadFile: (file: File) => Promise<Session>;
+    uploadFile: (file: File) => Promise<any>;
 }
 
 const SessionContext = createContext<SessionContextType | null>(null);
@@ -26,23 +26,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const [sessions, setSessions] = useState<any[]>([]);
 
     const loadSessions = useCallback(async () => {
-        const data = await api.getSessions();
-        setSessions(data);
+        try { setSessions(await api.getSessions()); } catch { }
     }, []);
 
-    const uploadFile = useCallback(async (file: File): Promise<Session> => {
+    const uploadFile = useCallback(async (file: File) => {
         const data = await api.uploadFile(file);
         const s: Session = {
-            id: data.session_id,
-            file_name: data.file_name,
-            rows: data.rows,
-            columns: data.columns,
-            column_names: data.column_names,
-            columns_meta: data.columns_meta,
+            id: data.session_id, file_name: data.file_name,
+            rows: data.rows, columns: data.columns,
+            column_names: data.column_names, columns_meta: data.columns_meta,
         };
         setSession(s);
         await loadSessions();
-        return s;
+        return data;
     }, [loadSessions]);
 
     return (
