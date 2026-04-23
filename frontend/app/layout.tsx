@@ -19,23 +19,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     rel="stylesheet"
                 />
             </head>
-            <body>
+            <body style={{ background: "#020812", color: "#EEF2FF", minHeight: "100vh" }}>
                 <SessionProvider>
-                    {/* Animated background layers */}
+                    {/* Animated background */}
                     <div className="grid-bg" />
                     <div className="orb orb-1" />
                     <div className="orb orb-2" />
                     <div className="orb orb-3" />
 
-                    {/* App layout */}
+                    {/* App shell */}
                     <div style={{ display: "flex", minHeight: "100vh", position: "relative", zIndex: 1 }}>
                         <Sidebar />
-                        <main style={{
-                            flex: 1,
-                            marginLeft: "var(--sidebar-w)",
-                            minHeight: "100vh",
-                            position: "relative",
-                        }}>
+                        <main style={{ flex: 1, marginLeft: 260, minHeight: "100vh" }}>
                             {children}
                         </main>
                     </div>
