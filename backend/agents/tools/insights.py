@@ -3,6 +3,21 @@ import numpy as np
 from scipy import stats
 from .load_data import get_dataframe
 
+MAX_INSIGHTS = 15
+MAX_OUTLIER_COLS = 8
+MAX_SKEWNESS_COLS = 8
+MAX_DOMINANT_CAT_COLS = 5
+MAX_CARDINALITY_CAT_COLS = 5
+MAX_TREND_COLS = 5
+HIGH_MISSING_THRESHOLD = 0.1
+OUTLIER_SIGNIFICANCE_THRESHOLD = 0.02
+HIGH_SKEWNESS_THRESHOLD = 2.0
+STRONG_CORRELATION_THRESHOLD = 0.75
+DOMINANT_CAT_THRESHOLD = 0.5
+HIGH_CARDINALITY_THRESHOLD = 0.8
+MIN_TREND_POINTS = 20
+TREND_CHANGE_THRESHOLD = 20.0
+
 def generate_insights(session_id: str) -> list[dict]:
     df = get_dataframe(session_id)
     if df is None:
@@ -14,7 +29,7 @@ def generate_insights(session_id: str) -> list[dict]:
 
     # 1. Missing data insights
     missing = df.isnull().sum()
-    high_missing = {col: int(missing[col]) for col in df.columns if missing[col] / len(df) > 0.1}
+    high_missing = {col: int(missing[col]) for col in df.columns if missing[col] / len(df) > HIGH_MISSING_THRESHOLD}
     if high_missing:
         worst = max(high_missing, key=high_missing.get)
         pct = round(high_missing[worst] / len(df) * 100, 1)
@@ -27,12 +42,12 @@ def generate_insights(session_id: str) -> list[dict]:
         })
 
     # 2. Outlier insights
-    for col in numeric_cols[:8]:
+    for col in numeric_cols[:MAX_OUTLIER_COLS]:
         Q1, Q3 = df[col].quantile(0.25), df[col].quantile(0.75)
         IQR = Q3 - Q1
         outlier_mask = (df[col] < Q1 - 3*IQR) | (df[col] > Q3 + 3*IQR)
         n_outliers = outlier_mask.sum()
-        if n_outliers > 0 and n_outliers / len(df) > 0.02:
+        if n_outliers > 0 and n_outliers / len(df) > OUTLIER_SIGNIFICANCE_THRESHOLD:
             insights.append({
                 "type": "outlier",
                 "title": f"Significant Outliers in '{col}'",
@@ -42,9 +57,9 @@ def generate_insights(session_id: str) -> list[dict]:
             })
 
     # 3. Skewness
-    for col in numeric_cols[:8]:
+    for col in numeric_cols[:MAX_SKEWNESS_COLS]:
         skew = df[col].skew()
-        if abs(skew) > 2:
+        if abs(skew) > HIGH_SKEWNESS_THRESHOLD:
             direction = "right" if skew > 0 else "left"
             insights.append({
                 "type": "distribution",
@@ -60,7 +75,7 @@ def generate_insights(session_id: str) -> list[dict]:
         for i in range(len(numeric_cols)):
             for j in range(i+1, len(numeric_cols)):
                 c = corr.iloc[i, j]
-                if abs(c) > 0.75:
+                if abs(c) > STRONG_CORRELATION_THRESHOLD:
                     direction = "positive" if c > 0 else "negative"
                     insights.append({
                         "type": "correlation",
@@ -71,9 +86,9 @@ def generate_insights(session_id: str) -> list[dict]:
                     })
 
     # 5. Dominant categories
-    for col in cat_cols[:5]:
+    for col in cat_cols[:MAX_DOMINANT_CAT_COLS]:
         vc = df[col].value_counts(normalize=True)
-        if vc.iloc[0] > 0.5:
+        if vc.iloc[0] > DOMINANT_CAT_THRESHOLD:
             insights.append({
                 "type": "distribution",
                 "title": f"Dominant Category in '{col}'",
@@ -83,9 +98,9 @@ def generate_insights(session_id: str) -> list[dict]:
             })
 
     # 6. High cardinality
-    for col in cat_cols[:5]:
+    for col in cat_cols[:MAX_CARDINALITY_CAT_COLS]:
         cardinality = df[col].nunique()
-        if cardinality > len(df) * 0.8:
+        if cardinality > len(df) * HIGH_CARDINALITY_THRESHOLD:
             insights.append({
                 "type": "data_quality",
                 "title": f"High Cardinality Column: '{col}'",
@@ -95,9 +110,9 @@ def generate_insights(session_id: str) -> list[dict]:
             })
 
     # 7. Trend detection (if sorted numeric data)
-    for col in numeric_cols[:5]:
+    for col in numeric_cols[:MAX_TREND_COLS]:
         series = df[col].dropna().reset_index(drop=True)
-        if len(series) > 20:
+        if len(series) > MIN_TREND_POINTS:
             half = len(series) // 2
             first_half_mean = series[:half].mean()
             second_half_mean = series[half:].mean()
@@ -105,7 +120,7 @@ def generate_insights(session_id: str) -> list[dict]:
             if mean_abs < 1e-6:
                 continue
             pct_change = ((second_half_mean - first_half_mean) / mean_abs) * 100
-            if abs(pct_change) > 20:
+            if abs(pct_change) > TREND_CHANGE_THRESHOLD:
                 direction = "increasing" if pct_change > 0 else "decreasing"
                 insights.append({
                     "type": "trend",
@@ -115,4 +130,4 @@ def generate_insights(session_id: str) -> list[dict]:
                     "column": col
                 })
 
-    return insights[:15]  # Top 15 insights
+    return insights[:MAX_INSIGHTS]

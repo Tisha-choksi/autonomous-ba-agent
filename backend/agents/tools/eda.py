@@ -3,6 +3,10 @@ import numpy as np
 import json
 from .load_data import get_dataframe
 
+TOP_CATEGORIES = 10
+MAX_CAT_COLS_EDA = 10
+IQR_MULTIPLIER = 1.5
+
 def run_eda(session_id: str) -> dict:
     df = get_dataframe(session_id)
     if df is None:
@@ -41,10 +45,10 @@ def run_eda(session_id: str) -> dict:
     # Duplicate rows
     duplicate_count = int(df.duplicated().sum())
 
-    # Categorical value counts (top 10)
+    # Categorical value counts
     cat_summary = {}
-    for col in categorical_cols[:10]:
-        vc = df[col].value_counts().head(10)
+    for col in categorical_cols[:MAX_CAT_COLS_EDA]:
+        vc = df[col].value_counts().head(TOP_CATEGORIES)
         cat_summary[col] = {str(k): int(v) for k, v in vc.items()}
 
     # Outliers (IQR method)
@@ -53,8 +57,8 @@ def run_eda(session_id: str) -> dict:
         Q1 = df[col].quantile(0.25)
         Q3 = df[col].quantile(0.75)
         IQR = Q3 - Q1
-        lower = Q1 - 1.5 * IQR
-        upper = Q3 + 1.5 * IQR
+        lower = Q1 - IQR_MULTIPLIER * IQR
+        upper = Q3 + IQR_MULTIPLIER * IQR
         n_outliers = int(((df[col] < lower) | (df[col] > upper)).sum())
         if n_outliers > 0:
             outliers[col] = {"count": n_outliers, "lower_bound": round(float(lower), 4),
