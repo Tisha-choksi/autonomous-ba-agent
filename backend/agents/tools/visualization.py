@@ -42,6 +42,11 @@ def generate_visualization(session_id: str, chart_type: str,
     if df is None:
         return {"error": "No data loaded"}
 
+    for col_name, label in [("x_col", "x_col"), ("y_col", "y_col"), ("color_col", "color_col")]:
+        val = locals()[col_name]
+        if val is not None and val not in df.columns:
+            return {"error": f"Column '{val}' not found in dataset. Available: {list(df.columns)}"}
+
     _set_dark_style()
     
     try:

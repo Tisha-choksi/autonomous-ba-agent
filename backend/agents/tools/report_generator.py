@@ -37,7 +37,8 @@ def generate_pdf_report(session_id: str, file_name: str = None) -> dict:
     kpis = calculate_kpis(session_id)
     insights = generate_insights(session_id)
 
-    out_name = file_name or f"ba_report_{session_id[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    out_name = file_name or f"ba_report_{session_id[:8]}_{ts}.pdf"
     out_path = EXPORTS_PATH / out_name
 
     doc = SimpleDocTemplate(str(out_path), pagesize=A4,
@@ -155,7 +156,8 @@ def generate_excel_report(session_id: str, file_name: str = None) -> dict:
     kpis = calculate_kpis(session_id)
     insights = generate_insights(session_id)
 
-    out_name = file_name or f"ba_report_{session_id[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    out_name = file_name or f"ba_report_{session_id[:8]}_{ts}.xlsx"
     out_path = EXPORTS_PATH / out_name
 
     wb = openpyxl.Workbook()

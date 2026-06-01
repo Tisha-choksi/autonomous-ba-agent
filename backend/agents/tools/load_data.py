@@ -120,7 +120,10 @@ def load_from_url(url: str) -> tuple[pd.DataFrame, str]:
         pass
 
     # Fallback: scrape structured data with BeautifulSoup
-    soup = BeautifulSoup(resp.text, "lxml")
+    try:
+        soup = BeautifulSoup(resp.text, "lxml")
+    except Exception:
+        soup = BeautifulSoup(resp.text, "html.parser")
     rows = []
 
     # Try <ul>/<li> lists
