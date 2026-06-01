@@ -19,12 +19,13 @@ load_dotenv()
 from db.sqlite_manager import (init_db, create_session, get_session, get_all_sessions,
                                  save_chat, get_chat_history, save_insight, get_insights,
                                  save_report, get_reports, save_kpis, delete_session)
-from agents.tools.load_data import load_file_to_df, store_dataframe, get_columns_meta, get_dataframe
+from agents.tools.load_data import load_file_to_df, store_dataframe, get_columns_meta, get_dataframe, drop_dataframe
 from agents.tools.eda import run_eda
 from agents.tools.kpi import calculate_kpis
 from agents.tools.insights import generate_insights
 from agents.tools.visualization import generate_visualization
 from agents.tools.data_cleaner import analyze_data_quality
+from agents.tools.report_generator import generate_pdf_report
 from agents.analyst_agent import get_or_create_agent
 
 STORAGE_PATH = Path(os.getenv("STORAGE_PATH", "./storage"))
@@ -136,6 +137,7 @@ def remove_session(session_id: str):
     file_path = Path(session.get("file_path", ""))
     if file_path.exists():
         file_path.unlink()
+    drop_dataframe(session_id)
     delete_session(session_id)
     return {"deleted": True}
 

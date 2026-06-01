@@ -63,6 +63,7 @@ def analyze_data_quality(session_id: str) -> dict:
 
 def clean_dataframe(session_id: str, operations: list[str]) -> dict:
     df = get_dataframe(session_id).copy()
+    rows_before = len(df)
     performed = []
 
     for op in operations:
@@ -100,9 +101,7 @@ def clean_dataframe(session_id: str, operations: list[str]) -> dict:
     store_dataframe(session_id, df)
     return {
         "operations_performed": performed,
-        "rows_before": len(get_dataframe(session_id)) + sum(
-            int(p.split(" ")[1]) for p in performed if p.split(" ")[1].isdigit()
-        ) if performed else len(df),
+        "rows_before": rows_before,
         "rows_after": len(df),
         "new_shape": {"rows": len(df), "cols": len(df.columns)}
     }

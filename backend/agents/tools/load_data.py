@@ -3,18 +3,45 @@ import numpy as np
 import json
 import io
 import sqlite3
+import time
 import requests
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-# Global in-memory store: session_id -> DataFrame
-_DATA_STORE: dict[str, pd.DataFrame] = {}
+# Global in-memory store: session_id -> (DataFrame, timestamp)
+_DATA_STORE: dict[str, tuple[pd.DataFrame, float]] = {}
+_MAX_SESSIONS = 50
+_TTL_SECONDS = 3600  # 1 hour
+
+def _evict_if_needed():
+    now = time.time()
+    # Remove expired entries
+    expired = [sid for sid, (_, ts) in _DATA_STORE.items() if now - ts > _TTL_SECONDS]
+    for sid in expired:
+        del _DATA_STORE[sid]
+    # Enforce size limit (LRU: remove oldest first)
+    while len(_DATA_STORE) > _MAX_SESSIONS:
+        oldest = min(_DATA_STORE.items(), key=lambda kv: kv[1][1])
+        del _DATA_STORE[oldest[0]]
+
+def drop_dataframe(session_id: str):
+    _DATA_STORE.pop(session_id, None)
 
 def store_dataframe(session_id: str, df: pd.DataFrame):
-    _DATA_STORE[session_id] = df
+    _evict_if_needed()
+    _DATA_STORE[session_id] = (df, time.time())
 
 def get_dataframe(session_id: str) -> pd.DataFrame | None:
-    return _DATA_STORE.get(session_id)
+    entry = _DATA_STORE.get(session_id)
+    if entry is None:
+        return None
+    df, ts = entry
+    if time.time() - ts > _TTL_SECONDS:
+        del _DATA_STORE[session_id]
+        return None
+    # Refresh timestamp on access
+    _DATA_STORE[session_id] = (df, time.time())
+    return df
 
 def load_file_to_df(file_path: str, file_type: str) -> pd.DataFrame:
     path = Path(file_path)
