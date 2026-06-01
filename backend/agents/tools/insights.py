@@ -101,7 +101,10 @@ def generate_insights(session_id: str) -> list[dict]:
             half = len(series) // 2
             first_half_mean = series[:half].mean()
             second_half_mean = series[half:].mean()
-            pct_change = ((second_half_mean - first_half_mean) / (abs(first_half_mean) + 1e-10)) * 100
+            mean_abs = abs(first_half_mean)
+            if mean_abs < 1e-6:
+                continue
+            pct_change = ((second_half_mean - first_half_mean) / mean_abs) * 100
             if abs(pct_change) > 20:
                 direction = "increasing" if pct_change > 0 else "decreasing"
                 insights.append({

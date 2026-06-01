@@ -3,6 +3,8 @@ import uuid
 import json
 import shutil
 import asyncio
+import pandas as pd
+import numpy as np
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -195,7 +197,6 @@ def create_visualization(req: VizRequest):
 def get_data_preview(session_id: str, page: int = 1, page_size: int = 50,
                      search: str = None, sort_col: str = None, sort_desc: bool = False):
     _ensure_data(session_id)
-    import pandas as pd
     df = get_dataframe(session_id)
     if search:
         mask = df.astype(str).apply(lambda col: col.str.contains(search, case=False)).any(axis=1)
@@ -206,15 +207,19 @@ def get_data_preview(session_id: str, page: int = 1, page_size: int = 50,
     start = (page - 1) * page_size
     end = start + page_size
     page_df = df.iloc[start:end]
-    import numpy as np
     records = []
     for _, row in page_df.iterrows():
         rec = {}
         for col in row.index:
             v = row[col]
-            if isinstance(v, (np.integer,)): rec[col] = int(v)
-            elif isinstance(v, (np.floating,)): rec[col] = None if np.isnan(v) else round(float(v), 4)
-            else: rec[col] = None if (hasattr(v, '__class__') and v.__class__.__name__ == 'float' and str(v) == 'nan') else str(v) if v != v else None
+            if pd.isna(v):
+                rec[col] = None
+            elif isinstance(v, (np.integer,)):
+                rec[col] = int(v)
+            elif isinstance(v, (np.floating,)):
+                rec[col] = None if np.isnan(v) else round(float(v), 4)
+            else:
+                rec[col] = str(v)
         records.append(rec)
     return {"total": total, "page": page, "page_size": page_size,
             "pages": (total + page_size - 1) // page_size,

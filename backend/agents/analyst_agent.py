@@ -181,6 +181,9 @@ class AnalystAgent:
 _AGENTS: dict[str, AnalystAgent] = {}
 
 def get_or_create_agent(session_id: str, provider: str = "groq") -> AnalystAgent:
+    from agents.tools.load_data import get_dataframe
+    if get_dataframe(session_id) is None:
+        raise ValueError(f"Session '{session_id}' has no data loaded. Upload a file first.")
     if session_id not in _AGENTS:
         _AGENTS[session_id] = AnalystAgent(session_id)
     return _AGENTS[session_id]
