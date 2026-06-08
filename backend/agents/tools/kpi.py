@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 from .load_data import get_dataframe
 
+MAX_GENERIC_KPI_COLS = 5
+KPI_KEY_MAX_LENGTH = 20
+
 def calculate_kpis(session_id: str) -> dict:
     df = get_dataframe(session_id)
     if df is None:
@@ -56,9 +59,15 @@ def calculate_kpis(session_id: str) -> dict:
             }
 
     # Generic numeric KPIs for all numeric cols
-    for col in numeric_cols[:5]:
-        if col not in [k.replace("total_", "").replace("avg_", "") for k in kpis]:
-            kpis[f"sum_{col.lower().replace(' ','_')[:20]}"] = {
+    used_columns = set()
+    for k, v in kpis.items():
+        label = v.get("label", "")
+        for c in numeric_cols:
+            if c.lower() in label.lower() or label.lower().endswith(c.lower()):
+                used_columns.add(c)
+    for col in numeric_cols[:MAX_GENERIC_KPI_COLS]:
+        if col not in used_columns:
+            kpis[f"sum_{col.lower().replace(' ','_')[:KPI_KEY_MAX_LENGTH]}"] = {
                 "value": round(float(df[col].sum()), 2),
                 "label": f"Sum of {col}", "format": "number"
             }

@@ -5,11 +5,13 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import base64
 import io
+import warnings
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.arima.model import ARIMA
-import warnings
-warnings.filterwarnings("ignore")
 from .load_data import get_dataframe
+
+DEFAULT_FORECAST_PERIODS = 12
+MIN_FORECAST_POINTS = 12
 
 PALETTE = ["#2563EB", "#7C3AED", "#059669"]
 
@@ -31,12 +33,14 @@ def run_forecast(session_id: str, value_col: str, date_col: str = None,
             return {"error": f"Column '{value_col}' not found"}
 
         series = df[value_col].dropna()
-        if len(series) < 12:
-            return {"error": "Need at least 12 data points for forecasting"}
+        if len(series) < MIN_FORECAST_POINTS:
+            return {"error": f"Need at least {MIN_FORECAST_POINTS} data points for forecasting"}
 
         # Exponential Smoothing forecast
-        model = ExponentialSmoothing(series, trend='add', seasonal=None)
-        fit = model.fit(optimized=True)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, module="statsmodels")
+            model = ExponentialSmoothing(series, trend='add', seasonal=None)
+            fit = model.fit(optimized=True)
         forecast = fit.forecast(periods)
 
         # Build chart

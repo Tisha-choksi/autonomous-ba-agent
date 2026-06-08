@@ -20,6 +20,14 @@ from .eda import run_eda
 from .kpi import calculate_kpis
 from .insights import generate_insights
 
+SESSION_ID_DISPLAY_LEN = 12
+MAX_REPORT_KPIS = 12
+MAX_REPORT_INSIGHTS = 8
+REPORT_SAMPLE_ROWS = 20
+MAX_PDF_TABLE_COLS = 8
+PDF_CELL_MAX_LENGTH = 15
+PDF_TABLE_WIDTH_CM = 17
+
 EXPORTS_PATH = Path("./exports")
 EXPORTS_PATH.mkdir(parents=True, exist_ok=True)
 
@@ -57,7 +65,7 @@ def generate_pdf_report(session_id: str, file_name: str = None) -> dict:
 
     # Header
     story.append(Paragraph("📊 Business Analysis Report", title_style))
-    story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y %H:%M')} | Session: {session_id[:12]}", body_style))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y %H:%M')} | Session: {session_id[:SESSION_ID_DISPLAY_LEN]}", body_style))
     story.append(HRFlowable(width="100%", thickness=2, color=BRAND_BLUE))
     story.append(Spacer(1, 0.4*cm))
 
@@ -91,7 +99,7 @@ def generate_pdf_report(session_id: str, file_name: str = None) -> dict:
     if kpis:
         story.append(Paragraph("Key Performance Indicators", h2_style))
         kpi_rows = [["KPI", "Value"]]
-        for k, v in list(kpis.items())[:12]:
+        for k, v in list(kpis.items())[:MAX_REPORT_KPIS]:
             val = v.get("value", 0)
             fmt = v.get("format", "number")
             if fmt == "currency": display = f"${val:,.2f}"
@@ -114,7 +122,7 @@ def generate_pdf_report(session_id: str, file_name: str = None) -> dict:
     # Insights
     if insights:
         story.append(Paragraph("AI-Generated Insights", h2_style))
-        for i, insight in enumerate(insights[:8], 1):
+        for i, insight in enumerate(insights[:MAX_REPORT_INSIGHTS], 1):
             severity_color = {"warning": "#F59E0B", "success": "#10B981", "info": "#3B82F6"}.get(
                 insight.get("severity", "info"), "#3B82F6")
             story.append(Paragraph(f"<b>{i}. {insight['title']}</b>", 
@@ -124,14 +132,14 @@ def generate_pdf_report(session_id: str, file_name: str = None) -> dict:
 
     # Data Sample
     story.append(PageBreak())
-    story.append(Paragraph("Data Sample (First 20 Rows)", h2_style))
-    sample = df.head(20)
-    cols = sample.columns.tolist()[:8]  # max 8 cols for PDF width
-    table_data = [[str(c)[:15] for c in cols]]
+    story.append(Paragraph(f"Data Sample (First {REPORT_SAMPLE_ROWS} Rows)", h2_style))
+    sample = df.head(REPORT_SAMPLE_ROWS)
+    cols = sample.columns.tolist()[:MAX_PDF_TABLE_COLS]
+    table_data = [[str(c)[:PDF_CELL_MAX_LENGTH] for c in cols]]
     for _, row in sample[cols].iterrows():
-        table_data.append([str(row[c])[:15] if pd.notna(row[c]) else "" for c in cols])
+        table_data.append([str(row[c])[:PDF_CELL_MAX_LENGTH] if pd.notna(row[c]) else "" for c in cols])
 
-    col_w = 17 * cm / len(cols)
+    col_w = PDF_TABLE_WIDTH_CM * cm / len(cols)
     dt = Table(table_data, colWidths=[col_w] * len(cols))
     dt.setStyle(TableStyle([
         ("BACKGROUND", (0,0), (-1,0), BRAND_BLUE),
