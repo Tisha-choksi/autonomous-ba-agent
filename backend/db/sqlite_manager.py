@@ -5,19 +5,86 @@ from datetime import datetime
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "ba_agent.db"
+SCHEMA_VERSION = 1
 
 def get_connection():
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     return conn
 
+def _get_schema_version(conn: sqlite3.Connection) -> int:
+    try:
+        return conn.execute("PRAGMA user_version").fetchone()[0]
+    except Exception:
+        return 0
+
+def _migrate(conn: sqlite3.Connection, from_version: int) -> None:
+    if from_version < 1:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                file_path TEXT,
+                file_name TEXT,
+                file_type TEXT,
+                row_count INTEGER,
+                col_count INTEGER,
+                columns_meta TEXT
+            );
+            
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                role TEXT,
+                content TEXT,
+                tool_used TEXT,
+                chart_data TEXT,
+                created_at TEXT,
+                FOREIGN KEY(session_id) REFERENCES sessions(id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS insights (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                insight_type TEXT,
+                title TEXT,
+                description TEXT,
+                severity TEXT,
+                chart_data TEXT,
+                created_at TEXT,
+                FOREIGN KEY(session_id) REFERENCES sessions(id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS reports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                report_type TEXT,
+                file_path TEXT,
+                file_name TEXT,
+                created_at TEXT,
+                FOREIGN KEY(session_id) REFERENCES sessions(id)
+            );
+            
+            CREATE TABLE IF NOT EXISTS kpi_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                kpis TEXT,
+                created_at TEXT,
+                FOREIGN KEY(session_id) REFERENCES sessions(id)
+            );
+        """)
+        conn.execute("PRAGMA user_version = 1")
+        conn.commit()
+
 def init_db():
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = get_connection()
-    cursor = conn.cursor()
-    
-    cursor.executescript("""
-        CREATE TABLE IF NOT EXISTS sessions (
+    current_ver = _get_schema_version(conn)
+    if current_ver < SCHEMA_VERSION:
+        _migrate(conn, current_ver)
+    conn.close()
             id TEXT PRIMARY KEY,
             name TEXT,
             created_at TEXT,

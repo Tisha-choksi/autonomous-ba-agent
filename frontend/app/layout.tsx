@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { SessionProvider } from "@/contexts/SessionContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const metadata: Metadata = {
     title: "BA Agent — Autonomous Business Analyst",
@@ -229,7 +230,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <div style={{ display: "flex", minHeight: "100vh", position: "relative", zIndex: 1 }}>
                         <Sidebar />
                         <main style={{ flex: 1, marginLeft: 260, minHeight: "100vh", background: "transparent" }}>
-                            {children}
+                            <ErrorBoundary>
+                                {children}
+                            </ErrorBoundary>
                         </main>
                     </div>
                 </SessionProvider>

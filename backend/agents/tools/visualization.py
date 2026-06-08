@@ -11,6 +11,13 @@ import io
 import json
 from .load_data import get_dataframe
 
+MAX_BAR_ITEMS = 15
+MAX_LINE_POINTS = 200
+HISTOGRAM_BINS = 30
+MAX_SCATTER_POINTS = 500
+MAX_PIE_SLICES = 8
+MAX_BOX_GROUPS = 10
+
 PALETTE = ["#2563EB", "#7C3AED", "#059669", "#D97706", "#DC2626",
            "#0891B2", "#9333EA", "#16A34A", "#EA580C", "#1D4ED8"]
 
@@ -35,6 +42,48 @@ def _set_dark_style():
         "grid.alpha": 0.5,
     })
 
+def _extract_chart_data(df: pd.DataFrame, chart_type: str,
+                         x_col=None, y_col=None, color_col=None) -> dict | None:
+    try:
+        if chart_type == "bar" and x_col and y_col:
+            data = df.groupby(x_col)[y_col].sum().sort_values(ascending=False).head(15)
+            return {"type": "bar", "data": [{"name": str(k), "value": round(float(v), 4)} for k, v in data.items()],
+                    "xKey": "name", "yKey": "value", "xLabel": x_col, "yLabel": y_col}
+
+        elif chart_type == "line" and x_col and y_col:
+            data = df[[x_col, y_col]].dropna().sort_values(x_col).head(MAX_LINE_POINTS)
+            return {"type": "line", "data": [{"name": str(r[x_col]), "value": round(float(r[y_col]), 4)} for _, r in data.iterrows()],
+                    "xKey": "name", "yKey": "value", "xLabel": x_col, "yLabel": y_col}
+
+        elif chart_type == "histogram":
+            col = x_col or y_col
+            counts, edges = np.histogram(df[col].dropna(), bins=HISTOGRAM_BINS)
+            return {"type": "histogram", "data": [{"name": f"{edges[i]:.1f}–{edges[i+1]:.1f}", "value": int(counts[i])} for i in range(len(counts))],
+                    "xKey": "name", "yKey": "value", "xLabel": col, "yLabel": "Count"}
+
+        elif chart_type == "scatter" and x_col and y_col:
+            data = df[[x_col, y_col]].dropna().head(MAX_SCATTER_POINTS)
+            return {"type": "scatter", "data": [{"x": round(float(r[x_col]), 4), "y": round(float(r[y_col]), 4)} for _, r in data.iterrows()],
+                    "xLabel": x_col, "yLabel": y_col}
+
+        elif chart_type == "pie":
+            col = x_col or color_col
+            data = df.groupby(col)[y_col].sum().head(MAX_PIE_SLICES) if y_col else df[col].value_counts().head(MAX_PIE_SLICES)
+            return {"type": "pie", "data": [{"name": str(k), "value": round(float(v), 4)} for k, v in data.items()],
+                    "xKey": "name", "yKey": "value"}
+
+        elif chart_type == "heatmap":
+            numeric_df = df.select_dtypes(include=[np.number])
+            corr = numeric_df.corr()
+            cols = corr.columns.tolist()
+            return {"type": "heatmap", "columns": cols,
+                    "matrix": [[round(float(corr.iloc[i, j]), 3) for j in range(len(cols))] for i in range(len(cols))]}
+
+    except Exception:
+        pass
+    return None
+
+
 def generate_visualization(session_id: str, chart_type: str,
                             x_col: str = None, y_col: str = None,
                             color_col: str = None, title: str = None) -> dict:
@@ -55,7 +104,7 @@ def generate_visualization(session_id: str, chart_type: str,
 
         if chart_type == "bar":
             if x_col and y_col:
-                data = df.groupby(x_col)[y_col].sum().sort_values(ascending=False).head(15)
+                data = df.groupby(x_col)[y_col].sum().sort_values(ascending=False).head(MAX_BAR_ITEMS)
                 bars = ax.bar(data.index.astype(str), data.values, color=PALETTE[0], edgecolor="#334155", linewidth=0.5)
                 ax.set_xlabel(x_col); ax.set_ylabel(y_col)
                 plt.xticks(rotation=45, ha="right")
@@ -75,7 +124,7 @@ def generate_visualization(session_id: str, chart_type: str,
         elif chart_type == "histogram":
             col = x_col or y_col
             if col and col in df.select_dtypes(include=[np.number]).columns:
-                ax.hist(df[col].dropna(), bins=30, color=PALETTE[0], edgecolor="#334155", linewidth=0.5)
+                ax.hist(df[col].dropna(), bins=HISTOGRAM_BINS, color=PALETTE[0], edgecolor="#334155", linewidth=0.5)
                 ax.set_xlabel(col); ax.set_ylabel("Frequency")
             else:
                 return {"error": "histogram requires a numeric column"}
@@ -94,9 +143,9 @@ def generate_visualization(session_id: str, chart_type: str,
             val_col = y_col
             if col:
                 if val_col:
-                    data = df.groupby(col)[val_col].sum().head(8)
+                    data = df.groupby(col)[val_col].sum().head(MAX_PIE_SLICES)
                 else:
-                    data = df[col].value_counts().head(8)
+                    data = df[col].value_counts().head(MAX_PIE_SLICES)
                 wedges, texts, autotexts = ax.pie(
                     data.values, labels=data.index.astype(str),
                     colors=PALETTE[:len(data)], autopct='%1.1f%%',
@@ -121,15 +170,16 @@ def generate_visualization(session_id: str, chart_type: str,
             ax.set_title(title or "Correlation Heatmap", color="#F1F5F9", pad=15)
             img_b64 = _fig_to_base64(fig)
             plt.close(fig)
-            return {"chart_type": chart_type, "image_base64": img_b64, "title": title or "Correlation Heatmap"}
+            return {"chart_type": chart_type, "image_base64": img_b64, "title": title or "Correlation Heatmap",
+                    "chart_data": _extract_chart_data(df, chart_type, x_col, y_col, color_col)}
 
         elif chart_type == "box":
             col = y_col or x_col
             if col and col in df.select_dtypes(include=[np.number]).columns:
                 if x_col and x_col != col:
                     groups = [grp[col].dropna().values for _, grp in df.groupby(x_col)]
-                    labels = df[x_col].unique()[:10].astype(str)
-                    bp = ax.boxplot(groups[:10], labels=labels, patch_artist=True)
+                    labels = df[x_col].unique()[:MAX_BOX_GROUPS].astype(str)
+                    bp = ax.boxplot(groups[:MAX_BOX_GROUPS], labels=labels, patch_artist=True)
                     for patch, color in zip(bp['boxes'], PALETTE):
                         patch.set_facecolor(color); patch.set_alpha(0.7)
                 else:
@@ -153,7 +203,8 @@ def generate_visualization(session_id: str, chart_type: str,
             "image_base64": img_b64,
             "title": title or f"{chart_type.title()} Chart",
             "x_col": x_col,
-            "y_col": y_col
+            "y_col": y_col,
+            "chart_data": _extract_chart_data(df, chart_type, x_col, y_col, color_col),
         }
 
     except Exception as e:
