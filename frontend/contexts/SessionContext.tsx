@@ -1,6 +1,8 @@
 "use client";
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { api } from "@/lib/api";
+
+const STORAGE_KEY = "ba_agent_session";
 
 interface Session {
     id: string;
@@ -22,8 +24,26 @@ interface SessionContextType {
 const SessionContext = createContext<SessionContextType | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-    const [session, setSession] = useState<Session | null>(null);
+    const [session, setSessionState] = useState<Session | null>(null);
     const [sessions, setSessions] = useState<any[]>([]);
+
+    const setSession = useCallback((s: Session | null) => {
+        setSessionState(s);
+        if (s) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+        } else {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    }, []);
+
+    useEffect(() => {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            try {
+                setSessionState(JSON.parse(stored));
+            } catch { }
+        }
+    }, []);
 
     const loadSessions = useCallback(async () => {
         try { setSessions(await api.getSessions()); } catch { }
@@ -39,7 +59,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setSession(s);
         await loadSessions();
         return data;
-    }, [loadSessions]);
+    }, [loadSessions, setSession]);
 
     return (
         <SessionContext.Provider value={{ session, sessions, setSession, loadSessions, uploadFile }}>
