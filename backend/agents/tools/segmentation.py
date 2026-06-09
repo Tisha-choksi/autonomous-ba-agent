@@ -10,7 +10,12 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from .load_data import get_dataframe
 
-PALETTE = ["#2563EB", "#7C3AED", "#059669", "#D97706", "#DC2626", "#0891B2"]
+DEFAULT_N_CLUSTERS = 4
+MAX_ELBOW_CLUSTERS = 8
+KMEANS_N_INIT = 10
+
+PALETTE = ["#2563EB", "#7C3AED", "#059669", "#D97706", "#DC2626", "#0891B2",
+           "#E11D48", "#0EA5E9"]
 
 def _fig_to_base64(fig) -> str:
     buf = io.BytesIO()
@@ -37,8 +42,8 @@ def run_segmentation(session_id: str, n_clusters: int = 4,
         scaler = StandardScaler()
         scaled = scaler.fit_transform(clean_df)
 
-        # Optimal clusters (elbow method, max 8)
-        max_k = min(8, len(clean_df) - 1)
+        # Optimal clusters (elbow method)
+        max_k = min(MAX_ELBOW_CLUSTERS, len(clean_df) - 1)
         inertias = []
         for k in range(2, max_k + 1):
             km = KMeans(n_clusters=k, random_state=42, n_init=10)

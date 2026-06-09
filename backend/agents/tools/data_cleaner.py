@@ -2,6 +2,12 @@ import pandas as pd
 import numpy as np
 from .load_data import get_dataframe, store_dataframe
 
+DROP_COL_MISSING_THRESHOLD = 70
+MAX_OUTLIER_CHECK_COLS = 10
+MIXED_TYPE_LOWER = 10
+MIXED_TYPE_UPPER = 90
+QUALITY_PENALTY_PER_ISSUE = 5
+
 def analyze_data_quality(session_id: str) -> dict:
     df = get_dataframe(session_id)
     if df is None:
@@ -15,7 +21,7 @@ def analyze_data_quality(session_id: str) -> dict:
     for col in df.columns:
         pct = missing[col] / len(df) * 100
         if pct > 0:
-            rec = "Drop column" if pct > 70 else ("Mean/median impute" if df[col].dtype in [np.float64, np.int64] else "Mode impute")
+            rec = "Drop column" if pct > DROP_COL_MISSING_THRESHOLD else ("Mean/median impute" if df[col].dtype in [np.float64, np.int64] else "Mode impute")
             issues.append({
                 "column": col, "issue": "missing_values",
                 "count": int(missing[col]), "pct": round(pct, 2), "recommendation": rec
@@ -31,7 +37,7 @@ def analyze_data_quality(session_id: str) -> dict:
         })
 
     # Outliers
-    for col in df.select_dtypes(include=[np.number]).columns[:10]:
+    for col in df.select_dtypes(include=[np.number]).columns[:MAX_OUTLIER_CHECK_COLS]:
         Q1, Q3 = df[col].quantile(0.25), df[col].quantile(0.75)
         IQR = Q3 - Q1
         outlier_count = int(((df[col] < Q1 - 3*IQR) | (df[col] > Q3 + 3*IQR)).sum())
@@ -45,14 +51,14 @@ def analyze_data_quality(session_id: str) -> dict:
     # Mixed types
     for col in df.select_dtypes(include=["object"]).columns:
         numeric_pct = pd.to_numeric(df[col], errors="coerce").notna().sum() / len(df) * 100
-        if 10 < numeric_pct < 90:
+        if MIXED_TYPE_LOWER < numeric_pct < MIXED_TYPE_UPPER:
             issues.append({
                 "column": col, "issue": "mixed_types",
                 "count": None, "pct": round(numeric_pct, 1),
                 "recommendation": f"{round(numeric_pct, 1)}% of values are numeric — consider type conversion"
             })
 
-    quality_score = max(0, 100 - len(issues) * 5)
+    quality_score = max(0, 100 - len(issues) * QUALITY_PENALTY_PER_ISSUE)
     return {
         "quality_score": quality_score,
         "total_issues": len(issues),
